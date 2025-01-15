@@ -1,4 +1,5 @@
-const {userExists} = require('../models/auth')
+const { userExists } = require('../models/auth')
+const bcrypt = require('bcrypt')
 
 module.exports = {
 
@@ -11,12 +12,19 @@ module.exports = {
             return res.status(422).json({ msg: 'a senha é obrigatório!' })
         }
 
-        const exists = await userExists(email);
-        if (!exists) {
-            return res.status(404).json({ msg: 'Passageiro não encontrado.' });
+        const user = await userExists(email);
+        console.log(user); 
+
+
+        if (!user) {
+            res.status(404).json({ msg: 'Email não encontrado' });
         }
 
+        const checkPassword = await bcrypt.compare(password, user.senha_passageiro)
 
-},
+        if(!checkPassword){
+            return res.status(422).json({msg:'senha invalida'})
+        }
+    },
 
 }
