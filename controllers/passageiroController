@@ -4,6 +4,9 @@ const TelefonePassageiroAtt = require('../models/passageiro/atualizarTelefone')
 const NomePassageiroAtt = require('../models/passageiro/atualizarNome')
 const deletePassageiro = require('../models/passageiro/deletar')
 const Joi = require('joi')
+const bcrypt = require('bcrypt')
+
+
 const passageiroSchema = Joi.object({
     nome_passageiro: Joi.string().max(45).required(),
     cpf_passageiro: Joi.string().max(14).required(),
@@ -34,15 +37,17 @@ module.exports = {
             })
     },
 
-    criar: function (req, res) {
+    criar: async function (req, res) {
         const { error } = passageiroSchema.validate(req.body)
+        
         if (error) {
             console.error('Erro de validação:', error.details);
             return res.status(400).send(`Dados inválidos: ${error.details.map(e => e.message).join(', ')}`);
         } else {
             const { nome_passageiro, cpf_passageiro, email_passageiro, rua_passageiro, cidade_passageiro, bairro_passageiro, uf_passageiro, senha_passageiro, telefone_passageiro } = req.body;
-
-            cadastrarPassageiro.criarPassageiro(nome_passageiro, cpf_passageiro, email_passageiro, rua_passageiro, cidade_passageiro, bairro_passageiro, uf_passageiro, senha_passageiro, telefone_passageiro)
+            const salt = await bcrypt.genSalt(12)
+            const passwordhash = await bcrypt.hash(senha_passageiro,salt)
+            cadastrarPassageiro.criarPassageiro(nome_passageiro, cpf_passageiro, email_passageiro, rua_passageiro, cidade_passageiro, bairro_passageiro, uf_passageiro, passwordhash, telefone_passageiro)
 
                 .then(function () {
                     res.send('passageiro cadastrado')
