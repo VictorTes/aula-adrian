@@ -3,6 +3,7 @@ express = require('express')
 app = express()
 router = require('./routes/passageiroRoutes')
 const routerauth = require('./routes/authUser')
+routerid = require('./routes/privateRoute')
 require('dotenv').config()
 const bcrypt = require('bcrypt')
 const jwt = require('jsonwebtoken')
@@ -15,6 +16,8 @@ const port = 3000
 
 app.use(router)
 app.use(routerauth)
+app.use(routerid)
+
 
 app.get('/', (req, res) => {
     res.status(200).json({ msg: 'bem vindo a api' })
