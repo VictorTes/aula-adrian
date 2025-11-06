@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+spec:
+  replicas: 1   # quantidade de réplicas do NGINX
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:latest   # imagem oficial do NGINX
+        ports:
+        - containerPort: 80   # porta padrão do NGINX
+        volumeMounts:
+        - name: nginx-config-volume
+          mountPath: /etc/nginx/conf.d  # onde o NGINX lê configs
+      volumes:
+      - name: nginx-config-volume
+        configMap:
+          name: nginx-config   # vamos criar um ConfigMap com o default.conf
