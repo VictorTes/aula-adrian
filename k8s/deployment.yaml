@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
         - name: monitor
-          image: monitor:v2
-          imagePullPolicy: Never
+          image: tesseroli2/monitor:latest
+          imagePullPolicy: IfNotPresent
           ports:
           - containerPort: 3000
