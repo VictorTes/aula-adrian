@@ -14,7 +14,7 @@ jobs:
 ci:
 runs-on: ubuntu-latest
 
-```
+
 steps:
   - name: Checkout
     uses: actions/checkout@v4
@@ -78,4 +78,4 @@ steps:
         ${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }}
       cache-from: type=registry,ref=${{ steps.vars.outputs.IMAGE }}:buildcache
       cache-to: type=registry,ref=${{ steps.vars.outputs.IMAGE }}:buildcache,mode=max
-```
+
