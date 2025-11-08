@@ -42,11 +42,10 @@ jobs:
       - name: Configure kubeconfig
         shell: pwsh
         run: |
-          if (-Not (Test-Path "$env:USERPROFILE\.kube")) {
-            New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.kube" | Out-Null
-          }
+          New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.kube" | Out-Null
           $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${{ secrets.KUBE_CONFIG_DATA }}"))
           Set-Content -Path "$env:USERPROFILE\.kube\config" -Value $decoded
+
 
       - name: Create namespace if not exists
         run: |
