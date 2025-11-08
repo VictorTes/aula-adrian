@@ -38,7 +38,7 @@ jobs:
       - name: Configure kubeconfig
         shell: pwsh
         run: |
-          # Cria a pasta .kube se não existir
+          # Garante que a pasta .kube existe (não falha se já existir)
           if (-Not (Test-Path "$env:USERPROFILE\.kube")) {
             New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.kube" | Out-Null
           }
