@@ -38,10 +38,8 @@ jobs:
       - name: Configure kubeconfig
         shell: pwsh
         run: |
-          # Garante que a pasta .kube existe (não falha se já existir)
-          if (-Not (Test-Path "$env:USERPROFILE\.kube")) {
-            New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.kube" | Out-Null
-          }
+          # Cria a pasta .kube usando .NET (não falha se já existir)
+          [System.IO.Directory]::CreateDirectory("$env:USERPROFILE\.kube") | Out-Null
 
           # Decodifica o conteúdo Base64 corretamente no PowerShell
           $bytes = [System.Convert]::FromBase64String("${{ secrets.KUBE_CONFIG_DATA }}")
