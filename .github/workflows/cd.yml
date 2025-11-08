@@ -12,9 +12,9 @@ jobs:
   deploy:
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: self-hosted
-    environment: production  # opcional: exige aprovação
+    environment: production
 
-    # 🔹 Adicionado para usar bash no runner Windows
+    # 🔹 Usa Bash do Git no Windows (Git Bash)
     defaults:
       run:
         shell: 'C:\PROGRA~1\Git\bin\bash.exe -e {0}'
@@ -28,7 +28,6 @@ jobs:
         run: |
           echo "IMAGE=tesseroli2/monitor" >> $GITHUB_OUTPUT
 
-          # Usa o SHA completo do workflow original e depois corta os 7 primeiros caracteres
           FULL_SHA=${{ github.event.workflow_run.head_sha }}
           echo "TAG_SHA=${FULL_SHA::7}" >> $GITHUB_OUTPUT
 
@@ -39,17 +38,21 @@ jobs:
         with:
           version: 'latest'
 
+      # ✅ Corrigido: agora é 100% compatível com Windows e não quebra se a pasta já existir
       - name: Configure kubeconfig
+        shell: pwsh
         run: |
-          if (!(Test-Path "$HOME/.kube")) { mkdir "$HOME/.kube" }
-          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > $HOME/.kube/config
+          if (-Not (Test-Path "$env:USERPROFILE\.kube")) {
+            New-Item -ItemType Directory -Force -Path "$env:USERPROFILE\.kube" | Out-Null
+          }
+          $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${{ secrets.KUBE_CONFIG_DATA }}"))
+          Set-Content -Path "$env:USERPROFILE\.kube\config" -Value $decoded
 
       - name: Create namespace if not exists
         run: |
           kubectl get ns ${{ steps.vars.outputs.NAMESPACE }} || \
           kubectl create ns ${{ steps.vars.outputs.NAMESPACE }}
 
-      # Aplica/garante os serviços/ingress/etc. estáticos (opcional na primeira vez)
       - name: Apply base manifests (Service, Prometheus, Grafana, Nginx)
         run: |
           kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/service.yaml || true
