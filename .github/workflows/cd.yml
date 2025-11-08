@@ -38,10 +38,10 @@ jobs:
       - name: Configure kubeconfig
         shell: pwsh
         run: |
-          # Cria a pasta .kube usando .NET (não falha se já existir)
+          # Cria a pasta .kube de forma idempotente
           [System.IO.Directory]::CreateDirectory("$env:USERPROFILE\.kube") | Out-Null
 
-          # Decodifica o conteúdo Base64 corretamente no PowerShell
+          # Decodifica o conteúdo Base64 e grava no arquivo config
           $bytes = [System.Convert]::FromBase64String("${{ secrets.KUBE_CONFIG_DATA }}")
           [System.IO.File]::WriteAllBytes("$env:USERPROFILE\.kube\config", $bytes)
 
