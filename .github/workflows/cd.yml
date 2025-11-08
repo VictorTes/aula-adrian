@@ -20,10 +20,12 @@ jobs:
 
       - name: Set vars
         id: vars
+        shell: pwsh
         run: |
-          echo "IMAGE=tesseroli2/monitor" >> $GITHUB_OUTPUT
-          echo "TAG_SHA=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
-          echo "NAMESPACE=${{ secrets.K8S_NAMESPACE || 'default' }}" >> $GITHUB_OUTPUT
+          "IMAGE=tesseroli2/monitor" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          "TAG_SHA=$($env:GITHUB_SHA.Substring(0,7))" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $namespace = if ($env:K8S_NAMESPACE) { $env:K8S_NAMESPACE } else { 'default' }
+          "NAMESPACE=$namespace" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
@@ -31,40 +33,51 @@ jobs:
           version: 'latest'
 
       - name: Configure kubeconfig
+        shell: pwsh
         run: |
-          mkdir -p $HOME/.kube
-          echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > $HOME/.kube/config
+          if (-not (Test-Path "$HOME\.kube")) { New-Item -ItemType Directory -Path "$HOME\.kube" | Out-Null }
+          $decoded = [System.Text.Encoding]::UTF8.GetString([System.Convert]::FromBase64String("${{ secrets.KUBE_CONFIG_DATA }}"))
+          $decoded | Out-File -FilePath "$HOME\.kube\config" -Encoding utf8
 
       - name: Create namespace if not exists
+        shell: pwsh
         run: |
-          kubectl get ns ${{ steps.vars.outputs.NAMESPACE }} || \
-          kubectl create ns ${{ steps.vars.outputs.NAMESPACE }}
+          kubectl get ns ${{ steps.vars.outputs.NAMESPACE }} 2>$null
+          if ($LASTEXITCODE -ne 0) {
+            kubectl create ns ${{ steps.vars.outputs.NAMESPACE }}
+          }
 
       # Aplica/garante os serviços/ingress/etc. estáticos (opcional na primeira vez)
       - name: Apply base manifests (Service, Prometheus, Grafana, Nginx)
+        shell: pwsh
         run: |
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/service.yaml || true
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/prometheus-deployment.yaml || true
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/grafana-deployment.yaml || true
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-deployment.yaml || true
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/nginx-service.yaml || true
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/prometheus-config.yaml || true
+          $namespace = "${{ steps.vars.outputs.NAMESPACE }}"
+          kubectl apply -n $namespace -f k8s/service.yaml --validate=false
+          kubectl apply -n $namespace -f k8s/prometheus-deployment.yaml --validate=false
+          kubectl apply -n $namespace -f k8s/grafana-deployment.yaml --validate=false
+          kubectl apply -n $namespace -f k8s/nginx-deployment.yaml --validate=false
+          kubectl apply -n $namespace -f k8s/nginx-service.yaml --validate=false
+          kubectl apply -n $namespace -f k8s/prometheus-config.yaml --validate=false
 
       # Aplica o Deployment do app (caso ainda não exista)
       - name: Apply app deployment (first time)
+        shell: pwsh
         run: |
-          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/deployment.yaml
+          kubectl apply -n ${{ steps.vars.outputs.NAMESPACE }} -f k8s/deployment.yaml --validate=false
 
       # Atualiza a imagem para a nova tag (idempotente)
       - name: Set image to new tag
+        shell: pwsh
         run: |
           kubectl set image deployment/monitor monitor=${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }} -n ${{ steps.vars.outputs.NAMESPACE }}
 
       - name: Wait rollout
+        shell: pwsh
         run: |
           kubectl rollout status deployment/monitor -n ${{ steps.vars.outputs.NAMESPACE }} --timeout=120s
 
       - name: Show services (debug)
+        shell: pwsh
         run: |
           kubectl get svc -n ${{ steps.vars.outputs.NAMESPACE }}
           kubectl get pods -o wide -n ${{ steps.vars.outputs.NAMESPACE }}
