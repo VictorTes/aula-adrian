@@ -14,10 +14,26 @@ jobs:
     runs-on: self-hosted
     environment: production
 
+    # Força TODOS os steps a usarem Windows PowerShell clássico (powershell.exe)
+    defaults:
+      run:
+        shell: powershell
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Diagnose shell
+        shell: powershell
+        run: |
+          Write-Host "Shell diagnostic:"
+          Write-Host "PSVersion: $($PSVersionTable.PSVersion)"
+          Write-Host "PSEdition: $($PSVersionTable.PSEdition)"
+          Write-Host "PowerShell executable: $($PSHOME)"
+          Write-Host "UserProfile: $env:USERPROFILE"
+          Write-Host "Runner OS: $env:RUNNER_OS"
+
+      # Define variáveis
       - name: Set vars
         id: vars
         shell: powershell
@@ -27,69 +43,85 @@ jobs:
           $FULL_SHA = "${{ github.event.workflow_run.head_sha }}"
           "TAG_SHA=$($FULL_SHA.Substring(0,7))" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
-          $namespace = if ("${{ secrets.K8S_NAMESPACE }}" -ne "") { "${{ secrets.K8S_NAMESPACE }}" } else { "default" }
-          "NAMESPACE=$namespace" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          $nsSecret = "${{ secrets.K8S_NAMESPACE }}"
+          if ([string]::IsNullOrWhiteSpace($nsSecret)) { $nsSecret = "default" }
+          "NAMESPACE=$nsSecret" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
       - name: Setup kubectl
         uses: azure/setup-kubectl@v4
         with:
           version: 'latest'
 
+      # Configura kubeconfig
       - name: Configure kubeconfig
         shell: powershell
         run: |
           $kubeDir = Join-Path $env:USERPROFILE ".kube"
-          if (-not (Test-Path $kubeDir)) {
-            New-Item -ItemType Directory -Path $kubeDir | Out-Null
-          }
+          [System.IO.Directory]::CreateDirectory($kubeDir) | Out-Null
 
           $configPath = Join-Path $kubeDir "config"
-          $decoded = [System.Text.Encoding]::UTF8.GetString(
-            [System.Convert]::FromBase64String("${{ secrets.KUBE_CONFIG_DATA }}")
-          )
-          Set-Content -Path $configPath -Value $decoded -Force
-          Write-Host "✅ kubeconfig configurado com sucesso em $configPath"
 
+          # Se o segredo estiver em Base64 (kubeconfig codificado), decodifica.
+          # Se não estiver, grava direto (fallback).
+          $raw = "${{ secrets.KUBE_CONFIG_DATA }}"
+          try {
+            $bytes = [System.Convert]::FromBase64String($raw)
+            [System.IO.File]::WriteAllBytes($configPath, $bytes)
+            Write-Host "✅ kubeconfig escrito via Base64 em $configPath"
+          } catch {
+            Set-Content -Path $configPath -Value $raw -Force
+            Write-Host "ℹ️ Segredo não era Base64. kubeconfig escrito como texto em $configPath"
+          }
+
+      # Namespace
       - name: Create namespace if not exists
         shell: powershell
         run: |
-          kubectl get ns "${{ steps.vars.outputs.NAMESPACE }}" 2>$null
+          $ns = "${{ steps.vars.outputs.NAMESPACE }}"
+          kubectl get ns $ns 2>$null
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "🔧 Namespace '${{ steps.vars.outputs.NAMESPACE }}' não existe, criando..."
-            kubectl create ns "${{ steps.vars.outputs.NAMESPACE }}"
+            Write-Host "🔧 Namespace '$ns' não existe, criando..."
+            kubectl create ns $ns
           } else {
-            Write-Host "✅ Namespace '${{ steps.vars.outputs.NAMESPACE }}' já existe."
+            Write-Host "✅ Namespace '$ns' já existe."
           }
 
+      # Manifests base
       - name: Apply base manifests (Service, Prometheus, Grafana, Nginx)
         shell: powershell
         run: |
-          kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/service.yaml
-          kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/prometheus-deployment.yaml
-          kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/grafana-deployment.yaml
-          kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/nginx-deployment.yaml
-          kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/nginx-service.yaml
-          kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/prometheus-config.yaml
+          $ns = "${{ steps.vars.outputs.NAMESPACE }}"
+          kubectl apply -n $ns -f k8s/service.yaml
+          kubectl apply -n $ns -f k8s/prometheus-deployment.yaml
+          kubectl apply -n $ns -f k8s/grafana-deployment.yaml
+          kubectl apply -n $ns -f k8s/nginx-deployment.yaml
+          kubectl apply -n $ns -f k8s/nginx-service.yaml
+          kubectl apply -n $ns -f k8s/prometheus-config.yaml
           Write-Host "✅ Manifests base aplicados."
 
-      - name: Apply app deployment (first time)
+      # App deployment
+      - name: Apply app deployment
         shell: powershell
         run: |
           kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/deployment.yaml
           Write-Host "✅ App deployment aplicado."
 
+      # Atualiza imagem
       - name: Set image to new tag
         shell: powershell
         run: |
-          kubectl set image deployment/monitor monitor="${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }}" -n "${{ steps.vars.outputs.NAMESPACE }}"
-          Write-Host "🔄 Atualizando imagem para tag ${{ steps.vars.outputs.TAG_SHA }}..."
+          $image = "${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }}"
+          kubectl set image deployment/monitor monitor=$image -n "${{ steps.vars.outputs.NAMESPACE }}"
+          Write-Host "🔄 Atualizando imagem para $image"
 
+      # Espera rollout
       - name: Wait rollout
         shell: powershell
         run: |
           kubectl rollout status deployment/monitor -n "${{ steps.vars.outputs.NAMESPACE }}" --timeout=120s
           Write-Host "✅ Rollout concluído."
 
+      # Debug
       - name: Show services (debug)
         shell: powershell
         run: |
