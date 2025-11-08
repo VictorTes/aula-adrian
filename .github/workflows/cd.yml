@@ -20,7 +20,7 @@ jobs:
 
       - name: Set vars
         id: vars
-        shell: pwsh
+        shell: powershell
         run: |
           "IMAGE=tesseroli2/monitor" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
 
@@ -36,7 +36,7 @@ jobs:
           version: 'latest'
 
       - name: Configure kubeconfig
-        shell: pwsh
+        shell: powershell
         run: |
           $kubeDir = Join-Path $env:USERPROFILE ".kube"
           if (-not (Test-Path $kubeDir)) {
@@ -51,7 +51,7 @@ jobs:
           Write-Host "✅ kubeconfig configurado com sucesso em $configPath"
 
       - name: Create namespace if not exists
-        shell: pwsh
+        shell: powershell
         run: |
           kubectl get ns "${{ steps.vars.outputs.NAMESPACE }}" 2>$null
           if ($LASTEXITCODE -ne 0) {
@@ -62,7 +62,7 @@ jobs:
           }
 
       - name: Apply base manifests (Service, Prometheus, Grafana, Nginx)
-        shell: pwsh
+        shell: powershell
         run: |
           kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/service.yaml
           kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/prometheus-deployment.yaml
@@ -73,25 +73,25 @@ jobs:
           Write-Host "✅ Manifests base aplicados."
 
       - name: Apply app deployment (first time)
-        shell: pwsh
+        shell: powershell
         run: |
           kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/deployment.yaml
           Write-Host "✅ App deployment aplicado."
 
       - name: Set image to new tag
-        shell: pwsh
+        shell: powershell
         run: |
           kubectl set image deployment/monitor monitor="${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }}" -n "${{ steps.vars.outputs.NAMESPACE }}"
           Write-Host "🔄 Atualizando imagem para tag ${{ steps.vars.outputs.TAG_SHA }}..."
 
       - name: Wait rollout
-        shell: pwsh
+        shell: powershell
         run: |
           kubectl rollout status deployment/monitor -n "${{ steps.vars.outputs.NAMESPACE }}" --timeout=120s
           Write-Host "✅ Rollout concluído."
 
       - name: Show services (debug)
-        shell: pwsh
+        shell: powershell
         run: |
           kubectl get svc -n "${{ steps.vars.outputs.NAMESPACE }}"
           kubectl get pods -o wide -n "${{ steps.vars.outputs.NAMESPACE }}"
