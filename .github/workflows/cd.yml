@@ -17,7 +17,7 @@ jobs:
     # Força TODOS os steps a usarem Windows PowerShell clássico (powershell.exe)
     defaults:
       run:
-        shell: powershell
+        shell: pwsh
 
     steps:
       - name: Checkout
@@ -60,19 +60,17 @@ jobs:
           [System.IO.Directory]::CreateDirectory($kubeDir) | Out-Null
 
           $configPath = Join-Path $kubeDir "config"
-
-          # Se o segredo estiver em Base64 (kubeconfig codificado), decodifica.
-          # Se não estiver, grava direto (fallback).
           $raw = "${{ secrets.KUBE_CONFIG_DATA }}"
+
           try {
             $bytes = [System.Convert]::FromBase64String($raw)
             [System.IO.File]::WriteAllBytes($configPath, $bytes)
-            Write-Host "✅ kubeconfig escrito via Base64 em $configPath"
+            Write-Host "kubeconfig written as Base64 in $configPath"
           } catch {
             Set-Content -Path $configPath -Value $raw -Force
-            Write-Host "INFO: Segredo nao era Base64. kubeconfig escrito como texto em $configPath"
-
+            Write-Host "Secret was not Base64. Written as plain text in $configPath"
           }
+
 
       # Namespace
       - name: Create namespace if not exists
