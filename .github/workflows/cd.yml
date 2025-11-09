@@ -79,10 +79,10 @@ jobs:
           $ns = "${{ steps.vars.outputs.NAMESPACE }}"
           kubectl get ns $ns 2>$null
           if ($LASTEXITCODE -ne 0) {
-            Write-Host "🔧 Namespace '$ns' não existe, criando..."
+            Write-Host "Namespace '$ns' não existe, criando..."
             kubectl create ns $ns
           } else {
-            Write-Host "✅ Namespace '$ns' já existe."
+            Write-Host "Namespace '$ns' já existe."
           }
 
       # Manifests base
@@ -96,14 +96,14 @@ jobs:
           kubectl apply -n $ns -f k8s/nginx-deployment.yaml
           kubectl apply -n $ns -f k8s/nginx-service.yaml
           kubectl apply -n $ns -f k8s/prometheus-config.yaml
-          Write-Host "✅ Manifests base aplicados."
+          Write-Host "Manifests base aplicados."
 
       # App deployment
       - name: Apply app deployment
         shell: powershell
         run: |
           kubectl apply -n "${{ steps.vars.outputs.NAMESPACE }}" -f k8s/deployment.yaml
-          Write-Host "✅ App deployment aplicado."
+          Write-Host "App deployment aplicado."
 
       # Atualiza imagem
       - name: Set image to new tag
@@ -111,14 +111,14 @@ jobs:
         run: |
           $image = "${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.TAG_SHA }}"
           kubectl set image deployment/monitor monitor=$image -n "${{ steps.vars.outputs.NAMESPACE }}"
-          Write-Host "🔄 Atualizando imagem para $image"
+          Write-Host "Atualizando imagem para $image"
 
       # Espera rollout
       - name: Wait rollout
         shell: powershell
         run: |
           kubectl rollout status deployment/monitor -n "${{ steps.vars.outputs.NAMESPACE }}" --timeout=120s
-          Write-Host "✅ Rollout concluído."
+          Write-Host "Rollout concluído."
 
       # Debug
       - name: Show services (debug)
