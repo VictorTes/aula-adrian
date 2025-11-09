@@ -70,7 +70,8 @@ jobs:
             Write-Host "✅ kubeconfig escrito via Base64 em $configPath"
           } catch {
             Set-Content -Path $configPath -Value $raw -Force
-            Write-Host "ℹ️ Segredo não era Base64. kubeconfig escrito como texto em $configPath"
+            Write-Host "INFO: Segredo nao era Base64. kubeconfig escrito como texto em $configPath"
+
           }
 
       # Namespace
