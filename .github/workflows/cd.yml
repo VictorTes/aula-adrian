@@ -71,6 +71,9 @@ jobs:
             Write-Host 'Secret was not Base64. Written as plain text in' $configPath
           }
 
+          # Set KUBECONFIG environment variable for subsequent steps
+          "KUBECONFIG=$configPath" | Out-File -FilePath $env:GITHUB_ENV -Append
+
 
       # Namespace
       - name: Create namespace if not exists
