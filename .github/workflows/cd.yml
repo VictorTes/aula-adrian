@@ -65,10 +65,10 @@ jobs:
           try {
             $bytes = [System.Convert]::FromBase64String($raw)
             [System.IO.File]::WriteAllBytes($configPath, $bytes)
-            Write-Host "kubeconfig written as Base64 in $configPath"
+            Write-Host ("kubeconfig written as Base64 in " + $configPath)
           } catch {
             Set-Content -Path $configPath -Value $raw -Force
-            Write-Host "Secret was not Base64. Written as plain text in $configPath"
+            Write-Host ("Secret was not Base64. Written as plain text in " + $configPath)
           }
 
 
